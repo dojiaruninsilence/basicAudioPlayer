@@ -8,7 +8,8 @@
     your controls and content.
 */
 class MainComponent  : public juce::AudioAppComponent, 
-                       public juce::ChangeListener
+                       public juce::ChangeListener,
+                       public juce::Timer
 {
 public:
     //==============================================================================
@@ -24,6 +25,8 @@ public:
     void paint (juce::Graphics& g) override;
     void resized() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
+    void timerCallback();
+    void updateLoopState(bool shouldLoop);
 
 private:
     enum TransportState {
@@ -39,10 +42,13 @@ private:
     void openButtonClicked();
     void playButtonClicked();
     void stopButtonClicked();
+    void loopButtonChanged();
     //==============================================================================
     juce::TextButton openButton;
     juce::TextButton playButton;
     juce::TextButton stopButton;
+    juce::ToggleButton loopingToggle;
+    juce::Label currentPositionLabel;
 
     std::unique_ptr<juce::FileChooser> chooser;
 

@@ -19,15 +19,23 @@ MainComponent::MainComponent()
     stopButton.setColour(juce::TextButton::buttonColourId, juce::Colours::red);
     stopButton.setEnabled(false);
 
+    addAndMakeVisible(&loopingToggle);
+    loopingToggle.setButtonText("Loop");
+    loopingToggle.onClick = [this] {loopButtonChanged();};
+
+    addAndMakeVisible(&currentPositionLabel);
+    currentPositionLabel.setText("Stopped", juce::dontSendNotification);
+
     // Make sure you set the size of the component after
     // you add any child components.
     setSize (300, 200);
 
-    formatManager.registerBasicFormats();   // [1]
-    transportSource.addChangeListener(this);// [2]
+    formatManager.registerBasicFormats();  
+    transportSource.addChangeListener(this);
 
     // Specify the number of input and output channels that we want to open
     setAudioChannels(0, 2);
+    startTimer(20);
 }
 
 MainComponent::~MainComponent() {
@@ -64,6 +72,8 @@ void MainComponent::resized() {
     openButton.setBounds(10, 10, getWidth() - 20, 20);
     playButton.setBounds(10, 40, getWidth() - 20, 20);
     stopButton.setBounds(10, 70, getWidth() - 20, 20);
+    loopingToggle.setBounds(10, 100, getWidth() - 20, 20);
+    currentPositionLabel.setBounds(10, 130, getWidth() - 20, 20);
 }
 
 void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
@@ -78,37 +88,59 @@ void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     }
 }
 
+void MainComponent::timerCallback() {
+    if (transportSource.isPlaying()) {
+        juce::RelativeTime position(transportSource.getCurrentPosition());
+
+        auto minutes = ((int)position.inMinutes()) % 60;
+        auto seconds = ((int)position.inSeconds()) % 60;
+        auto millis = ((int)position.inMilliseconds()) % 1000;
+
+        auto positionString = juce::String::formatted("%02d:%02d:%03d", minutes, seconds, millis);
+
+        currentPositionLabel.setText(positionString, juce::dontSendNotification);
+    } else {
+        currentPositionLabel.setText("Stopped", juce::dontSendNotification);
+    }
+}
+
+void MainComponent::updateLoopState(bool shouldLoop) {
+    if (readerSource.get() != nullptr) {
+        readerSource->setLooping(shouldLoop);
+    }
+}
+
 void MainComponent::changeState(TransportState newState) {
     if (state != newState) {
         state = newState;
         switch (state) {
-        case MainComponent::STOPPED:  //[3]
+        case MainComponent::STOPPED: 
             playButton.setButtonText("Play");
             stopButton.setButtonText("Stop");
             stopButton.setEnabled(false);
             transportSource.setPosition(0.0);
             break;
 
-        case MainComponent::STARTING: //[4]
+        case MainComponent::STARTING: 
             transportSource.start();
             break;
 
-        case MainComponent::PLAYING:  //[5]
+        case MainComponent::PLAYING:  
             playButton.setButtonText("Pause");
             stopButton.setButtonText("Stop");
             stopButton.setEnabled(true);
             break;
 
-        case MainComponent::PAUSING: //[6]
+        case MainComponent::PAUSING: 
             transportSource.stop();
             break;
 
-        case MainComponent::PAUSED:  //[5]
+        case MainComponent::PAUSED:
             playButton.setButtonText("Resume");
             stopButton.setButtonText("Return to Zero");
             break;
 
-        case MainComponent::STOPPING: //[6]
+        case MainComponent::STOPPING: 
             transportSource.stop();
             break;
         }
@@ -116,7 +148,7 @@ void MainComponent::changeState(TransportState newState) {
 }
 
 void MainComponent::openButtonClicked() {
-    chooser = std::make_unique<juce::FileChooser>("Select a Wave file to play...", juce::File{}, "*.wav");
+    chooser = std::make_unique<juce::FileChooser>("Select a Wave file to play...", juce::File{}, "*.wav;*.aif;*.aiff");
     auto chooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
 
     chooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
@@ -137,6 +169,7 @@ void MainComponent::openButtonClicked() {
 
 void MainComponent::playButtonClicked() {
     if ((state == STOPPED) || (state == PAUSED)) {
+        updateLoopState(loopingToggle.getToggleState());
         changeState(STARTING);
     } else if (state == PLAYING) {
         changeState(PAUSING);
@@ -149,4 +182,8 @@ void MainComponent::stopButtonClicked() {
     } else {
         changeState(STOPPING);
     }
+}
+
+void MainComponent::loopButtonChanged() {
+    updateLoopState(loopingToggle.getToggleState());
 }
