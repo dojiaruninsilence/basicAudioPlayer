@@ -70,8 +70,10 @@ void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     if (source == &transportSource) {
         if (transportSource.isPlaying()) {
             changeState(PLAYING);
-        } else {
+        } else if ((state == STOPPING) || (state == PLAYING)) {
             changeState(STOPPED);
+        } else if (state == PAUSING) {
+            changeState(PAUSED);
         }
     }
 }
@@ -81,18 +83,29 @@ void MainComponent::changeState(TransportState newState) {
         state = newState;
         switch (state) {
         case MainComponent::STOPPED:  //[3]
+            playButton.setButtonText("Play");
+            stopButton.setButtonText("Stop");
             stopButton.setEnabled(false);
-            playButton.setEnabled(true);
             transportSource.setPosition(0.0);
             break;
 
         case MainComponent::STARTING: //[4]
-            playButton.setEnabled(false);
             transportSource.start();
             break;
 
         case MainComponent::PLAYING:  //[5]
+            playButton.setButtonText("Pause");
+            stopButton.setButtonText("Stop");
             stopButton.setEnabled(true);
+            break;
+
+        case MainComponent::PAUSING: //[6]
+            transportSource.stop();
+            break;
+
+        case MainComponent::PAUSED:  //[5]
+            playButton.setButtonText("Resume");
+            stopButton.setButtonText("Return to Zero");
             break;
 
         case MainComponent::STOPPING: //[6]
@@ -123,9 +136,17 @@ void MainComponent::openButtonClicked() {
 }
 
 void MainComponent::playButtonClicked() {
-    changeState(STARTING);
+    if ((state == STOPPED) || (state == PAUSED)) {
+        changeState(STARTING);
+    } else if (state == PLAYING) {
+        changeState(PAUSING);
+    }
 }
 
 void MainComponent::stopButtonClicked() {
-    changeState(STOPPING);
+    if (state == PAUSED) {
+        changeState(STOPPED);
+    } else {
+        changeState(STOPPING);
+    }
 }

@@ -30,6 +30,8 @@ private:
         STOPPED,
         STARTING,
         PLAYING,
+        PAUSING,
+        PAUSED,
         STOPPING
     };
 
